@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Chaveamentos - Copa do Mundo 2026</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background: #f5f5f5; color: #333; margin: 20px; }
+        h1, h2, h3 { color: #002; }
+        .container { display: flex; flex-wrap: wrap; gap: 30px; }
+        .grupos { flex: 2; min-width: 300px; }
+        .chaveamento { flex: 3; min-width: 400px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #002; color: white; }
+        .grupo-table th { background: #005; }
+        .terceiros-table th { background: #550; }
+        .matchup { display: inline-block; padding: 8px 15px; margin: 5px; background: #eef; border-radius: 6px; cursor: pointer; border: 1px solid #ccc; }
+        .matchup:hover { background: #dde; }
+        .winner { background: #cfc !important; font-weight: bold; }
+        button { padding: 12px 24px; margin: 10px 5px; background: #005; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #003; }
+        .round { margin-bottom: 30px; }
+        .round h3 { border-bottom: 2px solid #005; padding-bottom: 5px; }
+        .info { background: #fff3cd; padding: 15px; border-radius: 6px; margin-bottom: 20px; }
+        @media (max-width: 768px) { .container { flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <h1>🏆 Simulador de Chaveamentos - Copa do Mundo 2026</h1>
+    <div class="info">
+        <p><strong>Instruções:</strong></p>
+        <ol>
+            <li>Clique em <strong>"Simular Fase de Grupos"</strong> para gerar resultados aleatórios da primeira fase.</li>
+            <li>Clique em <strong>"Simular Mata-Mata"</strong> para gerar os confrontos da rodada de 32 em diante.</li>
+            <li>Você pode clicar em qualquer equipe nos confrontos do mata-mata para alterar manualmente o vencedor.</li>
+            <li>O chaveamento segue o formato oficial da FIFA: os dois primeiros de cada grupo + os 8 melhores terceiros avançam para a rodada de 32[reference:2].</li>
+        </ol>
+    </div>
+
+    <div class="container">
+        <section class="grupos">
+            <h2>Fase de Grupos</h2>
+            <div id="grupos-container"></div>
+            <button onclick="simularFaseGrupos()">Simular Fase de Grupos</button>
+            <button onclick="simularMataMata()" id="btn-mata" disabled>Simular Mata-Mata</button>
+        </section>
+
+        <section class="chaveamento">
+            <h2>Chaveamento do Mata-Mata</h2>
+            <div id="chaveamento-container"></div>
+        </section>
+    </div>
+
+    <script>
+        // Dados dos grupos (conforme sorteio de 5/dez/2025)[reference:3]
+        const gruposData = [
+            { letra: 'A', times: ['México', 'África do Sul', 'Coreia do Sul', 'República Tcheca'] },
+            { letra: 'B', times: ['Canadá', 'Itália', 'Catar', 'Suíça'] },
+            { letra: 'C', times: ['Brasil', 'Marrocos', 'Haiti', 'Escócia'] },
+            { letra: 'D', times: ['Estados Unidos', 'Paraguai', 'Austrália', 'Turquia'] },
+            { letra: 'E', times: ['Alemanha', 'Curaçao', 'Costa do Marfim', 'Equador'] },
+            { letra: 'F', times: ['Holanda', 'Japão', 'Ucrânia', 'Tunísia'] },
+            { letra: 'G', times: ['Bélgica', 'Egito', 'Irã', 'Nova Zelândia'] },
+            { letra: 'H', times: ['Espanha', 'Cabo Verde', 'Arábia Saudita', 'Uruguai'] },
+            { letra: 'I', times: ['França', 'Senegal', 'Bolívia', 'Noruega'] },
+            { letra: 'J', times: ['Argentina', 'Argélia', 'Áustria', 'Jordânia'] },
+            { letra: 'K', times: ['Portugal', 'RD Congo', 'Uzbequistão', 'Colômbia'] },
+            { letra: 'L', times: ['Inglaterra', 'Croácia', 'Gana', 'Panamá'] }
+        ];
+
+        // Estado da simulação
+        let classificados = { primeiros: [], segundos: [], terceiros: [] };
+        let chaveamento = { r32: [], r16: [], qf: [], sf: [], final: [], terceiro: null };
+        let jogosGrupo = {}; // Armazena resultados da fase de grupos
+
+        // Função para simular um jogo (retorna um placar aleatório)
+        function simularJogo() {
+            const golsA = Math.floor(Math.random() * 5);
+            const golsB = Math.floor(Math.random() * 5);
+            return { golsA, golsB };
+        }
+
+        // Simula toda a fase de grupos
+        function simularFaseGrupos() {
+            classificados = { primeiros: [], segundos: [], terceiros: [] };
+            jogosGrupo = {};
+            const todosTerceiros = [];
+
+            gruposData.forEach(grupo => {
+                const times = grupo.times;
+                const resultados = {};
+                // Simula os 6 jogos do grupo
+                for (let i = 0; i < times.length; i++) {
+                    for (let j = i + 1; j < times.length; j++) {
+                        const jogo = simularJogo();
+                        const chave = `${times[i]}-${times[j]}`;
+                        resultados[chave] = jogo;
+                    }
+                }
+                jogosGrupo[grupo.letra] = resultados;
+
+                // Calcula pontos, saldo, gols pró
+                const tabela = times.map(time => ({
+                    time,
+                    pts: 0, sg: 0, gp: 0
+                }));
+                for (const [chave, jogo] of Object.entries(resultados)) {
+                    const [timeA, timeB] = chave.split('-');
+                    const idxA = tabela.findIndex(t => t.time === timeA);
+                    const idxB = tabela.findIndex(t => t.time === timeB);
+                    if (jogo.golsA > jogo.golsB) {
+                        tabela[idxA].pts += 3;
+                    } else if (jogo.golsA < jogo.golsB) {
+                        tabela[idxB].pts += 3;
+                    } else {
+                        tabela[idxA].pts += 1;
+                        tabela[idxB].pts += 1;
+                    }
+                    tabela[idxA].sg += jogo.golsA - jogo.golsB;
+                    tabela[idxB].sg += jogo.golsB - jogo.golsA;
+                    tabela[idxA].gp += jogo.golsA;
+                    tabela[idxB].gp += jogo.golsB;
+                }
+
+                // Ordena por pontos, saldo, gols pró
+                tabela.sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp);
+                classificados.primeiros.push({ grupo: grupo.letra, time: tabela[0].time });
+                classificados.segundos.push({ grupo: grupo.letra, time: tabela[1].time });
+                todosTerceiros.push({
+                    grupo: grupo.letra,
+                    time: tabela[2].time,
+                    pts: tabela[2].pts,
+                    sg: tabela[2].sg,
+                    gp: tabela[2].gp
+                });
+            });
+
+            // Ordena os terceiros para selecionar os 8 melhores
+            todosTerceiros.sort((a, b) => b.pts - b.pts || b.sg - a.sg || b.gp - a.gp);
+            classificados.terceiros = todosTerceiros.slice(0, 8);
+
+            // Atualiza a UI
+            renderizarGrupos();
+            document.getElementById('btn-mata').disabled = false;
+            alert('Fase de grupos simulada! Clique em "Simular Mata-Mata" para gerar os confrontos.');
+        }
+
+        // Renderiza as tabelas de grupo
+        function renderizarGrupos() {
+            const container = document.getElementById('grupos-container');
+            container.innerHTML = '';
+            gruposData.forEach(grupo => {
+                const resultados = jogosGrupo[grupo.letra] || {};
+                const tabela = grupo.times.map(time => ({
+                    time,
+                    pts: 0, sg: 0, gp: 0
+                }));
+                for (const [chave, jogo] of Object.entries(resultados)) {
+                    const [timeA, timeB] = chave.split('-');
+                    const idxA = tabela.findIndex(t => t.time === timeA);
+                    const idxB = tabela.findIndex(t => t.time === timeB);
+                    if (jogo.golsA > jogo.golsB) {
+                        tabela[idxA].pts += 3;
+                    } else if (jogo.golsA < jogo.golsB) {
+                        tabela[idxB].pts += 3;
+                    } else {
+                        tabela[idxA].pts += 1;
+                        tabela[idxB].pts += 1;
+                    }
+                    tabela[idxA].sg += jogo.golsA - jogo.golsB;
+                    tabela[idxB].sg += jogo.golsB - jogo.golsA;
+                    tabela[idxA].gp += jogo.golsA;
+                    tabela[idxB].gp += jogo.golsB;
+                }
+                tabela.sort((a, b) => b.pts - a.pts || b.sg - a.sg || b.gp - a.gp);
+                let html = `<h3>Grupo ${grupo.letra}</h3><table class="grupo-table"><tr><th>Pos</th><th>Time</th><th>PTS</th><th>SG</th><th>GP</th></tr>`;
+                tabela.forEach((t, i) => {
+                    html += `<tr><td>${i+1}</td><td>${t.time}</td><td>${t.pts}</td><td>${t.sg}</td><td>${t.gp}</td></tr>`;
+                });
+                html += '</table>';
+                container.innerHTML += html;
+            });
+
+            // Tabela de terceiros colocados
+            if (classificados.terceiros.length > 0) {
+                let html = `<h3>Melhores Terceiros Colocados</h3><table class="terceiros-table"><tr><th>Grupo</th><th>Time</th><th>PTS</th><th>SG</th><th>GP</th></tr>`;
+                classificados.terceiros.forEach(t => {
+                    html += `<tr><td>${t.grupo}</td><td>${t.time}</td><td>${t.pts}</td><td>${t.sg}</td><td>${t.gp}</td></tr>`;
+                });
+                html += '</table>';
+                container.innerHTML += html;
+            }
+        }
+
+        // Simula o mata-mata a partir dos classificados
+        function simularMataMata() {
+            // Define os confrontos da rodada de 32 conforme o formato oficial[reference:4]
+            const confrontosR32 = [
+                { m: 1, a: classificados.segundos.find(s => s.grupo === 'A').time, b: classificados.segundos.find(s => s.grupo === 'B').time },
+                { m: 2, a: classificados.primeiros.find(p => p.grupo === 'E').time, b: classificados.terceiros[0].time },
+                { m: 3, a: classificados.primeiros.find(p => p.grupo === 'F').time, b: classificados.segundos.find(s => s.grupo === 'C').time },
+                { m: 4, a: classificados.primeiros.find(p => p.grupo === 'C').time, b: classificados.segundos.find(s => s.grupo === 'F').time },
+                { m: 5, a: classificados.primeiros.find(p => p.grupo === 'I').time, b: classificados.terceiros[1].time },
+                { m: 6, a: classificados.segundos.find(s => s.grupo === 'E').time, b: classificados.segundos.find(s => s.grupo === 'I').time },
+                { m: 7, a: classificados.primeiros.find(p => p.grupo === 'A').time, b: classificados.terceiros[2].time },
+                { m: 8, a: classificados.primeiros.find(p => p.grupo === 'L').time, b: classificados.terceiros[3].time },
+                { m: 9, a: classificados.primeiros.find(p => p.grupo === 'D').time, b: classificados.terceiros[4].time },
+                { m: 10, a: classificados.primeiros.find(p => p.grupo === 'G').time, b: classificados.terceiros[5].time },
+                { m: 11, a: classificados.segundos.find(s => s.grupo === 'K').time, b: classificados.segundos.find(s => s.grupo === 'L').time },
+                { m: 12, a: classificados.primeiros.find(p => p.grupo === 'H').time, b: classificados.segundos.find(s => s.grupo === 'J').time },
+                { m: 13, a: classificados.primeiros.find(p => p.grupo === 'B').time, b: classificados.terceiros[6].time },
+                { m: 14, a: classificados.primeiros.find(p => p.grupo === 'J').time, b: classificados.segundos.find(s => s.grupo === 'H').time },
+                { m: 15, a: classificados.primeiros.find(p => p.grupo === 'K').time, b: classificados.terceiros[7].time },
+                { m: 16, a: classificados.segundos.find(s => s.grupo === 'D').time, b: classificados.segundos.find(s => s.grupo === 'G').time }
+            ];
+
+            // Simula cada confronto (escolhe aleatoriamente um vencedor)
+            chaveamento.r32 = confrontosR32.map(conf => ({
+                ...conf,
+                vencedor: Math.random() < 0.5 ? conf.a : conf.b
+            }));
+
+            // Gera as rodadas subsequentes
+            simularRodada('r16', 8, chaveamento.r32);
+            simularRodada('qf', 4, chaveamento.r16);
+            simularRodada('sf', 2, chaveamento.qf);
+            // Final e terceiro lugar
+            chaveamento.final = [
+                { a: chaveamento.sf[0].vencedor, b: chaveamento.sf[1].vencedor, vencedor: null }
+            ];
+            chaveamento.final[0].vencedor = Math.random() < 0.5 ? chaveamento.final[0].a : chaveamento.final[0].b;
+            chaveamento.terceiro = {
+                a: chaveamento.sf[0].vencedor === chaveamento.final[0].vencedor ? chaveamento.sf[0].b : chaveamento.sf[0].a,
+                b: chaveamento.sf[1].vencedor === chaveamento.final[0].vencedor ? chaveamento.sf[1].b : chaveamento.sf[1].a,
+                vencedor: null
+            };
+            chaveamento.terceiro.vencedor = Math.random() < 0.5 ? chaveamento.terceiro.a : chaveamento.terceiro.b;
+
+            renderizarChaveamento();
+        }
+
+        // Função auxiliar para simular uma rodada do mata-mata
+        function simularRodada(nome, numConfrontos, anterior) {
+            chaveamento[nome] = [];
+            for (let i = 0; i < numConfrontos; i++) {
+                const a = anterior[i*2].vencedor;
+                const b = anterior[i*2+1].vencedor;
+                chaveamento[nome].push({
+                    a, b,
+                    vencedor: Math.random() < 0.5 ? a : b
+                });
+            }
+        }
+
+        // Renderiza o chaveamento do mata-mata
+        function renderizarChaveamento() {
+            const container = document.getElementById('chaveamento-container');
+            container.innerHTML = '';
+
+            const rodadas = [
+                { titulo: 'Rodada de 32 (16-avos)', dados: chaveamento.r32 },
+                { titulo: 'Oitavas de Final', dados: chaveamento.r16 },
+                { titulo: 'Quartas de Final', dados: chaveamento.qf },
+                { titulo: 'Semifinais', dados: chaveamento.sf },
+                { titulo: 'Disputa do 3º Lugar', dados: [chaveamento.terceiro] },
+                { titulo: 'Final', dados: chaveamento.final }
+            ];
+
+            rodadas.forEach(rodada => {
+                if (!rodada.dados || rodada.dados.length === 0) return;
+                let html = `<div class="round"><h3>${rodada.titulo}</h3>`;
+                rodada.dados.forEach((conf, idx) => {
+                    html += `
+                        <div>
+                            <span class="matchup ${conf.vencedor === conf.a ? 'winner' : ''}" onclick="alterarVencedor('${rodada.titulo}', ${idx}, 'a')">${conf.a}</span>
+                            vs
+                            <span class="matchup ${conf.vencedor === conf.b ? 'winner' : ''}" onclick="alterarVencedor('${rodada.titulo}', ${idx}, 'b')">${conf.b}</span>
+                        </div>`;
+                });
+                html += '</div>';
+                container.innerHTML += html;
+            });
+        }
+
+        // Permite alterar manualmente o vencedor de um confronto
+        function alterarVencedor(rodada, idx, time) {
+            let dados;
+            if (rodada.includes('32')) dados = chaveamento.r32;
+            else if (rodada.includes('Oitavas')) dados = chaveamento.r16;
+            else if (rodada.includes('Quartas')) dados = chaveamento.qf;
+            else if (rodada.includes('Semifinais')) dados = chaveamento.sf;
+            else if (rodada.includes('3º')) dados = [chaveamento.terceiro];
+            else dados = chaveamento.final;
+
+            if (!dados[idx]) return;
+            dados[idx].vencedor = time === 'a' ? dados[idx].a : dados[idx].b;
+            // Atualiza as rodadas subsequentes
+            if (rodada.includes('32')) simularRodada('r16', 8, chaveamento.r32);
+            if (rodada.includes('Oitavas')) simularRodada('qf', 4, chaveamento.r16);
+            if (rodada.includes('Quartas')) simularRodada('sf', 2, chaveamento.qf);
+            if (rodada.includes('Semifinais')) {
+                chaveamento.final[0].a = chaveamento.sf[0].vencedor;
+                chaveamento.final[0].b = chaveamento.sf[1].vencedor;
+                chaveamento.terceiro.a = chaveamento.sf[0].vencedor === chaveamento.final[0].a ? chaveamento.sf[0].b : chaveamento.sf[0].a;
+                chaveamento.terceiro.b = chaveamento.sf[1].vencedor === chaveamento.final[0].b ? chaveamento.sf[1].b : chaveamento.sf[1].a;
+            }
+            renderizarChaveamento();
+        }
+
+        // Inicializa a página
+        renderizarGrupos();
+    </script>
+</body>
+</html>
